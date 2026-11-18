@@ -1,4 +1,4 @@
-const CACHE='smash-speed-v7';
+const CACHE='smash-speed-v8';
 const FILES=['./','./index.html','./styles.css','./app.js','./speed.js','./js/live.js','./js/live-worker.js','./js/live-ui.js','./js/uncertainty.js','./js/fit.js', './js/subpixel.js','./js/geometry.js','./js/track.js','./js/mp4fps.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('message',event=>{if(event.data==='SKIP_WAITING')self.skipWaiting()});
