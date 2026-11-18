@@ -1,5 +1,5 @@
-const CACHE='smash-speed-v2';
-const FILES=['./','./index.html','./styles.css','./app.js','./speed.js','./js/track.js','./js/mp4fps.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./apple-touch-icon.png'];
+const CACHE='smash-speed-v3';
+const FILES=['./','./index.html','./styles.css','./app.js','./speed.js','./js/geometry.js','./js/track.js','./js/mp4fps.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('message',event=>{if(event.data==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('smash-speed-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
