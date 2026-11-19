@@ -1,8 +1,10 @@
+import {installBroadcast} from './broadcast.js';
 import {homographyFrom4,cameraFromHomography,groundPoint,planeFromGround} from './geometry.js';
 export function installLive({courtUI,state:s,video:v,draw,dimensions,distance,history,writeHistory}){
  const $=id=>document.getElementById(id),say=(id,t)=>$(id).textContent=t,storage='smash-live-cal-v1';
  let worker,busy=false,token=0,ring=[],lastClip=[],trajectory=[],lastEvent,session=[],dropped=0,processed=0,start=0,replaying=false,audio;
  const canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(320,180):document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+ const broadcast=installBroadcast({video:v,courtUI});
  const median=a=>[...a].sort((a,b)=>a-b)[a.length>>1];
  s.stop=()=>{courtUI?.endReplay();s.running=false;token++;worker?.terminate();worker=null;busy=false;replaying=false;draw();$('detectLive').textContent='開始偵測'};
  const overlay=(points=trajectory,curve=[])=>{draw();const d=dimensions();if(!d)return;const c=$('liveOverlay').getContext('2d'),scale=d.w/canvas.width;c.strokeStyle='#65d8e6';c.lineWidth=2;for(const arr of [points,curve]){c.beginPath();arr.forEach((p,i)=>{const x=d.x+p.x*scale*d.scale,y=d.y+p.y*scale*d.scale;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();}for(const p of points){c.beginPath();c.arc(d.x+p.x*scale*d.scale,d.y+p.y*scale*d.scale,3,0,7);c.fillStyle='#c7f36b';c.fill();}};
@@ -21,7 +23,7 @@ export function installLive({courtUI,state:s,video:v,draw,dimensions,distance,hi
  $('sensitivity').oninput=()=>say('sensitivityValue',$('sensitivity').value);
  function save(e){writeHistory([{id:globalThis.crypto?.randomUUID?.()||String(Date.now()),date:new Date().toISOString(),speedKmh:e.speedKmh,sigmaKmh:e.sigmaKmh,confidence:e.confidence,method:e.method,mode:'即時',fps:e.fps,note:$('liveNote').value.trim()},...history()]);}
  $('saveLive').onclick=()=>{if(lastEvent)save(lastEvent)};
- function event(e){courtUI?.shot('live',{...e,points:e.points.map(p=>({...p,x:p.x*v.videoWidth/canvas.width,y:p.y*v.videoWidth/canvas.width}))});lastEvent=e;trajectory=e.points;overlay(e.points,e.curve);say('liveStatus',e.smash?'偵測到殺球': '高速球路（非殺球）');if(!e.smash)return;
+ function event(e){broadcast.shot(e);courtUI?.shot('live',{...e,points:e.points.map(p=>({...p,x:p.x*v.videoWidth/canvas.width,y:p.y*v.videoWidth/canvas.width}))});lastEvent=e;trajectory=e.points;overlay(e.points,e.curve);say('liveStatus',e.smash?'偵測到殺球': '高速球路（非殺球）');if(!e.smash)return;
  s.peak=e.speedKmh;session.push(e.speedKmh);$('liveResult').innerHTML=`${e.speedKmh.toFixed(1)} <small>km/h</small>`;say('liveDetail',`± ${e.sigmaKmh.toFixed(1)} km/h · 信心：${e.confidence} · ${e.reasons.join('；')||e.method}${e.streakKmh?` · 拖影參考 ${e.streakKmh.toFixed(0)} km/h`:''}`);say('liveSession',`本節最佳 ${Math.max(...session).toFixed(1)} · 平均 ${(session.reduce((a,b)=>a+b,0)/session.length).toFixed(1)} · ${session.length} 球`);
  lastClip=ring.map(f=>({...f,points:e.points.filter(p=>p.time<=f.t)}));$('liveReplay').disabled=!lastClip.length;if($('liveAutoSave').checked)save(e);if($('liveSound').checked){navigator.vibrate?.(120);try{const a=audio||(audio=new (window.AudioContext||window.webkitAudioContext)()),o=a.createOscillator(),g=a.createGain();g.gain.value=.08;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12);o.onended=()=>{o.disconnect();g.disconnect()}}catch{}}
  }
