@@ -1,3 +1,4 @@
+import {contains,flightPlane} from './anyangle.js';
 import {fitDrag} from './fit.js';
 import {intersectRay,planeQuality} from './geometry.js';
 import {refineDifference} from './subpixel.js';
@@ -6,11 +7,12 @@ import {monteCarlo} from './uncertainty.js';
 const median=a=>{a=[...a].sort((x,y)=>x-y);return a.length?a[a.length>>1]:0};
 // Coordinates supplied to calibration are full camera pixels; all tracking is analysis pixels.
 export class LiveDetector {
- constructor({width,height,calib,minSpeedKmh=100,sensitivity=50,settings={}}){if(typeof calib==='number')calib={mpp:calib,fullWidth:width};Object.assign(this,{width,height,calib,minSpeedKmh,sensitivity,settings});this.tracks=[];this.intervals=[];this.serial=0;}
+ constructor({width,height,calib,minSpeedKmh=100,sensitivity=50,settings={}}){if(typeof calib==='number')calib={mpp:calib,fullWidth:width};Object.assign(this,{width,height,calib,minSpeedKmh,sensitivity,settings});this.roiIgnoredCandidates=0;this.tracks=[];this.intervals=[];this.serial=0;}
  world(p){const c=this.calib,s=c.fullWidth/this.width||c.scale||1,q={x:p.x*s,y:p.y*s};return c.camera?intersectRay(c.camera,q,c.plane):{x:q.x*c.mpp,y:q.y*c.mpp};}
  finish(track){
   const p=track.points,ts=p.slice(1).map((q,i)=>q.time-p[i].time),fps=1/median(ts);
   if(p.length<(fps<40?2:3))return null;
+  if(this.calib.camera&&this.calib.H&&this.calib.direction?.length!==2){const scale=this.calib.fullWidth/this.width;const choice=flightPlane(this.calib.camera,this.calib.H,p.map(q=>({x:q.x*scale,y:q.y*scale})),[],this.calib.widthM,this.calib.lengthM);this.calib.plane=choice.plane;this.calib.estimatedPlane=choice.estimated;this.calib.planeSource=choice.source;}
   let marks;try{marks=p.map(q=>({...this.world(q),time:q.time,sigma:.5}));}catch{return null;}
   const a=marks[0],z=marks.at(-1),dist=Math.hypot(z.x-a.x,z.y-a.y,(z.z||0)-(a.z||0));
   if(dist/(z.time-a.time)*3.6<this.minSpeedKmh*.65)return null;
@@ -22,7 +24,7 @@ export class LiveDetector {
   const pixelMetres=this.calib.mpp*(this.calib.fullWidth/this.width||1)||.015;
   // fitDrag v0 is anchored to the first detection, so extrapolation beyond observed time is capped at zero.
   const fit=fitDrag(marks,{pixelMetres,prior:.2});if(!fit||fit.rmsPx>3)return null;
-  const speedKmh=fit.v0*3.6;if(speedKmh<this.minSpeedKmh||speedKmh>700)return null;
+  const speedKmh=fit.v0*3.6;if(speedKmh<this.minSpeedKmh||speedKmh>700||(this.calib.estimatedPlane&&speedKmh>400))return null;
   // Two isolated blobs cannot establish a fast smash. At low frame rates retain
   // a two-point estimate only when independent, aligned exposure streaks support it.
   if(p.length===2&&(!p.every(q=>q.streak&&q.contrast>=35)||ts[0]>1.5/fps))return null;
@@ -34,13 +36,14 @@ export class LiveDetector {
   const count=Math.min(4,p.length),mcPoints=Array.from({length:count},(_,i)=>p[Math.round(i*(p.length-1)/(count-1))]);
   const mc=options?monteCarlo({...options,marks:mcPoints.map(q=>({...q,x:q.x*s,y:q.y*s,sigma:.5*s})),timeSigma:jitter,impactTime:0},12):null;
   const planeAngle=this.calib.camera?planeQuality(this.calib.camera,this.calib.plane).angle:90;
-  const sigmaKmh=Math.max(planeAngle<10?speedKmh*.5:0,mc?.sigma*3.6||0,speedKmh*(fps<40?.20:fps<90?.10:.04),fit.sigma*3.6||0);
-  const reasons=[];if(planeAngle<10)reasons.push('球路平面夾角太小，球速不可靠');if(fps<40)reasons.push('30fps：取樣不足');else if(fps<90)reasons.push('60fps：時間解析度有限');if(p.length<4)reasons.push('可用球點少');if(this.calib.camera?.source==='fallback')reasons.push('鏡頭焦距為估算');if(this.calib.camera&&!mc)reasons.push('斜角校準誤差未能完整估計');
+  const sigmaKmh=Math.max(this.calib.estimatedPlane||this.calib.limited?speedKmh*.3:0,planeAngle<10?speedKmh*.5:0,mc?.sigma*3.6||0,speedKmh*(fps<40?.20:fps<90?.10:.04),fit.sigma*3.6||0);
+  const reasons=[];if(this.calib.limited)reasons.push('局部兩點比例，透視未解');if(this.calib.estimatedPlane)reasons.push('球路平面為估算，請補畫球路方向確認');if(planeAngle<10)reasons.push('球路平面夾角太小，球速不可靠');if(fps<40)reasons.push('30fps：取樣不足');else if(fps<90)reasons.push('60fps：時間解析度有限');if(p.length<4)reasons.push('可用球點少');if(this.calib.camera?.source==='fallback')reasons.push('鏡頭焦距為估算');if(this.calib.camera&&!mc)reasons.push('斜角校準誤差未能完整估計');
   const downward=this.calib.camera?z.z<a.z:dy>0;
+  if(this.calib.estimatedPlane&&downward&&p.length<4)return null;
   if(!downward)reasons.push('非向下球路');
   let streakKmh;const exposure=this.settings.exposureTime;if(exposure>0){const values=p.filter(q=>q.streak).map(q=>{try{const d=q.length/2,v={x:Math.cos(q.orientation)*d,y:Math.sin(q.orientation)*d},a=this.world({x:q.x-v.x,y:q.y-v.y}),b=this.world({x:q.x+v.x,y:q.y+v.y});return Math.hypot(b.x-a.x,b.y-a.y,(b.z||0)-(a.z||0))/exposure*3.6}catch{return NaN}}).filter(Number.isFinite);if(values.length)streakKmh=median(values);}
   const curve=Array.from({length:25},(_,i)=>{const t=(z.time-a.time)*i/24,span=fit.k?Math.log1p(fit.k*fit.v0*t)/fit.k:fit.v0*t,total=fit.k?Math.log1p(fit.k*fit.v0*(z.time-a.time))/fit.k:fit.v0*(z.time-a.time);return {x:p[0].x+dx*span/total,y:p[0].y+dy*span/total}});
-  return {speedKmh,sigmaKmh,confidence:fps<40||sigmaKmh/speedKmh>.2?'低':fps<90||reasons.length?'中':'高',reasons,points:p,fps,downward,smash:downward,method:`${this.calib.camera?'斜角':'側面'} · drag 擬合（首個偵測點）`,streakKmh,curve,firstTime:p[0].time,extrapolationSeconds:0};
+  return {flightPlaneAngle:planeAngle,planeSource:this.calib.planeSource,speedKmh,sigmaKmh,confidence:fps<40||sigmaKmh/speedKmh>.2?'低':fps<90||reasons.length?'中':'高',reasons,points:p,fps,downward,smash:downward,method:`${this.calib.camera?'斜角':'側面'} · drag 擬合（首個偵測點）`,streakKmh,curve,firstTime:p[0].time,extrapolationSeconds:0};
  }
  push(frame,t){
   const {width:w,height:h,data}=frame;if(w!==this.width||h!==this.height||data.length!==w*h*4||!Number.isFinite(t))throw Error('Invalid live frame');
@@ -68,8 +71,9 @@ export class LiveDetector {
   for(let i=0;i<lum.length;i++){const b=Math.max(0,Math.min(255,this.bg[i]+offset));bgFrame.data[i*4]=bgFrame.data[i*4+1]=bgFrame.data[i*4+2]=b;bgFrame.data[i*4+3]=255;if(Math.abs(lum[i]-b)<threshold)this.bg[i]+=.008*(lum[i]-b);}
   const blobs=findMotion(bgFrame,frame,{threshold,minPixels:2,maxPixels:w*h,includeBounds:true});
   const resolution=Math.max(1,w/320),maxBlob=180*resolution*resolution;
+  const scale=this.calib.fullWidth/w||1,within=p=>contains(this.calib.roi,{x:p.x*scale,y:p.y*scale});
   const large=blobs.filter(b=>b.size>maxBlob),candidates=[];
-  for(const b of blobs){if(b.size>maxBlob||b.brightness/b.size<threshold*1.3)continue;
+  for(const b of blobs){if(!within(b)){this.roiIgnoredCandidates++;continue;}if(b.size>maxBlob||b.brightness/b.size<threshold*1.3)continue;
    // Keep a detached bright shuttle beside a player/racket at impact. Reject
    // only components actually inside a player's body, rather than its padded box.
    const inside=large.filter(a=>a.maxX-a.minX<w*.2&&a.maxY-a.minY<h*.75).some(a=>b.maxX>=a.minX-1&&b.minX<=a.maxX+1&&b.maxY>=a.minY-1&&b.minY<=a.maxY+1);
@@ -94,6 +98,6 @@ export class LiveDetector {
    const ended=tr.missed>=3||predicted.x<0||predicted.x>=w||predicted.y<0||predicted.y>=h;if(ended||p.length>=8){if(!tr.reported){const result=this.finish(tr);if(result){event ||= result;tr.reported=true;}}if(ended)tr.done=true;}
   }
   this.tracks=this.tracks.filter(tr=>!tr.done);candidates.forEach((p,i)=>{if(!used.has(i)&&this.tracks.length<24)this.tracks.push({id:++this.serial,points:[p],missed:0})});
-  return {candidates,event,people:large.map(b=>({minX:b.minX,minY:b.minY,maxX:b.maxX,maxY:b.maxY,size:b.size})),points:this.tracks.reduce((a,b)=>a.length>b.points.length?a:b.points,[])};
+  return {candidates,event,people:large.filter(b=>within({x:(b.minX+b.maxX)/2,y:b.maxY})).map(b=>({minX:b.minX,minY:b.minY,maxX:b.maxX,maxY:b.maxY,size:b.size})),points:this.tracks.reduce((a,b)=>a.length>b.points.length?a:b.points,[])};
  }
 }
