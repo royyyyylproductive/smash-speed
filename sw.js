@@ -1,5 +1,5 @@
-const CACHE='smash-speed-v11';
-const FILES=['./','./index.html','./styles.css','./app.js','./speed.js','./js/anyangle.js','./js/live.js','./js/live-worker.js','./js/live-ui.js','./js/uncertainty.js','./js/fit.js', './js/subpixel.js','./js/geometry.js','./js/track.js','./js/mp4fps.js','./js/court.js','./js/minimap.js','./js/pose.js','./js/pose-worker.js','./js/rally.js','./js/court-ui.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./apple-touch-icon.png'];
+const CACHE='smash-speed-v12';
+const FILES=['./','./index.html','./styles.css','./app.js','./speed.js','./js/anyangle.js','./js/live.js','./js/live-worker.js','./js/live-ui.js','./js/broadcast.js','./js/record.js','./js/uncertainty.js','./js/fit.js', './js/subpixel.js','./js/geometry.js','./js/track.js','./js/mp4fps.js','./js/court.js','./js/minimap.js','./js/pose.js','./js/pose-worker.js','./js/rally.js','./js/court-ui.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('message',event=>{if(event.data==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('smash-speed-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

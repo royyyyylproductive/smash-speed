@@ -126,3 +126,15 @@ to{stroke-dasharray:210 320}
 .court-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}.court-mini{position:absolute;right:8px;bottom:8px;z-index:4;background:#080f1cd9;border:1px solid #c7f36b55;border-radius:9px;padding:4px;pointer-events:none}.court-mini span{display:block;font-size:9px;color:#c7f36b;text-align:center}.court-mini canvas{display:block;width:72px;height:122px}.court-panel h3{margin-top:0}.court-panel input[type=checkbox]{width:auto;min-height:24px}.player-names{display:grid;grid-template-columns:1fr 1fr;gap:8px}.player-names label{font-size:12px}.court-panel [hidden]{display:none!important}.rally-hud{color:#c7f36b;font-variant-numeric:tabular-nums;font-size:13px}.match-score{display:grid;grid-template-columns:1fr 1fr;gap:8px}.match-score input{width:100%;text-align:center}.match-score .row{justify-content:space-between;gap:4px}.match-score button{min-width:44px;min-height:44px;padding:7px}.match-score strong{font-size:28px;color:#c7f36b}.shot-sequence{display:flex;gap:8px;overflow-x:auto;margin:8px 0}.shot-chip{flex:0 0 125px;padding:8px;border:1px solid #25374d;border-radius:8px;font-size:12px}.shot-chip select{font-size:13px;min-height:44px}.rally-suggestion{padding:10px;background:#192b39;border-radius:10px}.rally-suggestion button{margin:3px;min-height:44px}
 .stage .court-mini canvas{position:static;inset:auto;width:72px;height:122px}
 .landmark-diagram{display:block;max-width:100%;margin:10px 0;border:1px solid #25374d;border-radius:9px;background:#080f1c}
+/* Broadcast is a view of the existing camera; safe-area values also feed canvas layout. */
+#broadcast{--safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px);position:fixed;inset:0;z-index:1000;background:#080f1c;isolation:isolate}
+#broadcast[hidden],#broadcastChrome[hidden]{display:none}
+.broadcast-active{overflow:hidden}
+#broadcast .broadcast-video,#broadcastCanvas{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover}
+#broadcastCanvas{z-index:1;touch-action:manipulation}
+#broadcastChrome{position:absolute;z-index:2;left:calc(12px + var(--safe-left));right:calc(12px + var(--safe-right));top:calc(110px + var(--safe-top));padding:12px;border:1px solid #65d8e644;border-radius:16px;background:#080f1cf2;box-shadow:0 8px 24px #0005;max-height:calc(100% - 140px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto}
+#broadcastChrome button{min-height:40px;padding:8px 12px;font-size:13px}
+#broadcastChrome .primary{background:#c7f36b;color:#080f1c}
+#broadcastChrome label{font-size:13px;margin:0}
+#broadcastStatus{font-size:12px;color:#a4b4c7;margin:8px 0 0}
+#broadcastDownload{color:#65d8e6}
