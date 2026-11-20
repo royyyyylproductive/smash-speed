@@ -29,14 +29,14 @@ export function installBroadcast({video,courtUI}){
   const L=overlayLayout(w,h,ins),data=snapshot(),vw=demo?1280:video.videoWidth,vh=demo?720:video.videoHeight;
   c.fillStyle='#080f1c';c.fillRect(0,0,w,h);const scale=Math.max(w/(vw||w),h/(vh||h)),ox=(w-vw*scale)/2,oy=(h-vh*scale)/2;
   if(demo)drawDemo(c,w,h);else if(video.readyState>=2)c.drawImage(video,ox,oy,vw*scale,vh*scale);
-  const xy=p=>({x:ox+p.x*scale,y:oy+p.y*scale});
+  const xy=p=>({x:ox+p.x*scale,y:oy+p.y*scale});for(const p of data.players||[]){const q=xy(p.foot);c.fillStyle='#c7f36b';c.beginPath();c.arc(q.x,q.y,5,0,7);c.fill();c.font='bold 12px system-ui';c.fillText(p.name,q.x+7,q.y-7)}
   const path=points=>{c.beginPath();points.forEach((p,i)=>{const q=xy(p);i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y)});c.stroke()};
   if(data.H&&lines.checked){c.strokeStyle='#c7f36b99';c.lineWidth=1.5;try{const inverse=invertH(data.H);for(const line of courtLines(data.widthM,data.lengthM))path(line.map(([x,y])=>applyH(inverse,{x,y})))}catch{}}
   c.strokeStyle='#65d8e6';c.lineWidth=2.5;path(data.points||[]);c.fillStyle='#c7f36b';for(const p of (data.points||[]).slice(-40)){const q=xy(p);c.beginPath();c.arc(q.x,q.y,2.8,0,7);c.fill()}
   const box=(r)=>{c.fillStyle='#080f1cdd';c.fillRect(r.x,r.y,r.width,r.height)};
-  box(L.hud);c.fillStyle='#c7f36b';c.font='bold 15px system-ui';c.fillText(data.score||'近場 0 : 0 遠場',L.hud.x+10,L.hud.y+20,L.hud.width-20);c.fillStyle='#f1f6fa';c.font='11px system-ui';c.fillText(data.hud||'等待擊球',L.hud.x+10,L.hud.y+39,L.hud.width-20);
+  box(L.hud);c.fillStyle='#c7f36b';c.font='bold 15px system-ui';c.fillText(data.score||'近場 0 : 0 遠場',L.hud.x+10,L.hud.y+20,L.hud.width-20);c.fillStyle='#f1f6fa';c.font='11px system-ui';c.fillText(data.playerStatus||data.hud||'等待擊球',L.hud.x+10,L.hud.y+39,L.hud.width-20);
   if(data.H){if(now-lastMini>(renderCost>12?600:160)){drawMinimap(mini,data.H,data.points||[],data);lastMini=now}box(L.minimap);c.drawImage(mini,L.minimap.x,L.minimap.y,L.minimap.width,L.minimap.height)}
-  else {c.fillStyle='#f1f6fa';c.font='12px system-ui';c.fillText('校準後可顯示場線及小地圖',L.bounds.left,L.bounds.bottom-12,w-32)}
+  else {c.fillStyle='#f1f6fa';c.font='12px system-ui';c.fillText('請先完成設定及校準場地；可先用鏡頭控制構圖',L.bounds.left,L.bounds.bottom-12,w-32)}
   const age=demo?400:now-lastSmash;if(speed>0&&age<4700){const alpha=Math.min(1,age/160,(4700-age)/700),r=L.speed;c.save();c.globalAlpha=Math.max(0,alpha);const pop=1+(renderCost>12?0:.12)*Math.max(0,1-age/260);c.translate(r.x,r.y+r.height);c.scale(pop,pop);c.fillStyle='#080f1cbb';c.fillRect(0,-r.height,r.width,r.height);c.fillStyle='#65d8e6';c.font='bold 11px system-ui';c.fillText('上一球 · 殺球',10,-72);c.fillStyle='#c7f36b';c.font=`900 ${Math.min(52,r.width/3.3)}px system-ui`;c.fillText(speed.toFixed(0),8,-20);c.font='bold 12px system-ui';c.fillText('km/h',10,-4);c.restore()}
   if(demo){c.fillStyle='#c7f36b';c.font='bold 13px system-ui';c.fillText('DEMO · 示範畫面',L.bounds.left+150,L.timer.y+19,w-180)}
   if(chromeState.indicatorVisible){box(L.timer);c.fillStyle='#ff525e';c.beginPath();c.arc(L.timer.x+12,L.timer.y+14,4,0,7);c.fill();c.fillStyle='#fff';c.font='bold 14px system-ui';c.fillText('REC '+elapsedTime(now-started),L.timer.x+24,L.timer.y+19)}

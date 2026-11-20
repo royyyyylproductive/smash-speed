@@ -1,3 +1,4 @@
+import {poseInput,mapPerson} from './pose-input.js';
 import {applyH} from './geometry.js';
 export class PlayerTracker{
  constructor(){this.players=[];this.memory=[];this.serial=0}
@@ -12,8 +13,8 @@ export class PlayerTracker{
 // Dedicated worker owns TF tensors; only a single 256px sample can be in flight.
 export class PoseSampler{
  constructor(onResult,onFallback){this.onResult=onResult;this.onFallback=onFallback;this.busy=false;this.last=0;this.slow=0;this.enabled=false}
- start(){if(this.worker||this.failed)return;try{this.worker=new Worker(new URL('./pose-worker.js',import.meta.url));this.busy=true;this.timer=setTimeout(()=>this.fail(),20000);this.worker.onmessage=({data:m})=>{clearTimeout(this.timer);this.busy=false;if(m.error)return this.fail();if(m.ready)return;this.slow=m.ms>100?this.slow+1:0;if(this.slow>=3)return this.fail();if(this.enabled)this.onResult(m.people)};this.worker.onerror=()=>this.fail()}catch{this.fail()}}
+ start(){if(this.worker||this.failed)return;try{this.worker=new Worker(new URL('./pose-worker.js',import.meta.url));this.busy=true;this.timer=setTimeout(()=>this.fail(),20000);this.worker.onmessage=({data:m})=>{clearTimeout(this.timer);this.busy=false;if(m.error)return this.fail();if(m.ready)return;this.slow=m.ms>100?this.slow+1:0;this.interval=Math.max(160,(m.ms||0)*2);if(this.enabled)this.onResult(m.people.map(p=>mapPerson(p,this.transform)))};this.worker.onerror=()=>this.fail()}catch{this.fail()}}
  fail(){clearTimeout(this.timer);this.worker?.terminate();this.worker=null;this.busy=false;this.failed=true;this.onFallback()}
- sample(video){if(!this.enabled||this.failed||document.hidden||video.readyState<2||performance.now()-this.last<160||this.busy)return;this.start();if(this.busy||!this.worker)return;this.last=performance.now();this.canvas ||= document.createElement('canvas');this.canvas.width=this.canvas.height=256;const c=this.canvas.getContext('2d',{willReadFrequently:true});c.drawImage(video,0,0,256,256);const image=c.getImageData(0,0,256,256);this.busy=true;this.timer=setTimeout(()=>this.fail(),5000);this.worker.postMessage({buffer:image.data.buffer},[image.data.buffer])}
+ sample(video){if(!this.enabled||this.failed||document.hidden||video.readyState<2||video.paused||performance.now()-this.last<(this.interval||160)||this.busy)return;this.start();if(this.busy||!this.worker)return;this.last=performance.now();this.canvas ||= document.createElement('canvas');this.canvas.width=this.canvas.height=256;const c=this.canvas.getContext('2d',{willReadFrequently:true});this.transform=poseInput(video.videoWidth,video.videoHeight,this.roi);const t=this.transform;c.fillStyle="#000";c.fillRect(0,0,256,256);c.drawImage(video,t.x,t.y,t.w,t.h,t.px,t.py,t.w*t.scale,t.h*t.scale);const image=c.getImageData(0,0,256,256);this.busy=true;this.timer=setTimeout(()=>this.fail(),5000);this.worker.postMessage({buffer:image.data.buffer},[image.data.buffer])}
  stop(){this.enabled=false;clearTimeout(this.timer);this.worker?.terminate();this.worker=null;this.busy=false}
 }
